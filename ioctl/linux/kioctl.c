@@ -12,15 +12,26 @@
  * \author Sebastien Vincent
  * \date 2017
  */
-
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/miscdevice.h>
 #include <linux/fs.h>
+#include <linux/interrupt.h>
+#include <linux/smp.h>
+
+#include <linux/vmalloc.h>
+#include <linux/spinlock.h>
+
+#include <linux/delay.h>
+
+#include <asm/irqflags.h>
 
 #include <asm/uaccess.h>
 #include <linux/uaccess.h>
+
+// get current task
+#include <asm/current.h>
 
 #include "kioctl.h"
 
@@ -191,6 +202,8 @@ static long kioctl_ioctl(struct file* filep, unsigned int cmd, unsigned long arg
     return 0;
 }
 
+static spinlock_t *lock;
+
 /**
  * \brief Module initialization.
  *
@@ -199,6 +212,25 @@ static long kioctl_ioctl(struct file* filep, unsigned int cmd, unsigned long arg
  */
 static int __init kioctl_init(void)
 {
+    // lock = vmalloc(sizeof(spinlock_t));
+    // spin_lock_init(lock);
+    // spin_lock_irq(lock);
+    bool has_action = irq_has_action(11);
+
+    int cpu_id = get_cpu();
+    printk("Curr CPU: %d\n", cpu_id);
+
+    struct task_struct *task = get_current();
+    printk("Curr Task PID: %d\n", task->pid);
+
+    local_irq_disable();
+
+    mdelay(10000);
+
+    local_irq_enable();
+
+    printk(KERN_INFO "%s: IRQ has action! : %d\n", THIS_MODULE->name, has_action);
+
     int ret = 0;
 
     printk(KERN_INFO "%s: initialization\n", THIS_MODULE->name);
@@ -208,7 +240,7 @@ static int __init kioctl_init(void)
 
     if(ret == 0)
     { 
-        printk(KERN_INFO "%s device created correctly\n", THIS_MODULE->name);
+        printk(KERN_INFO "%s device created!\n", THIS_MODULE->name);
     }
 
     return ret;
